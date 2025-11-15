@@ -68,7 +68,7 @@ app.use('/api/admin', adminObservationRoutes);
 //   console.log(`Server running at http://localhost:${port}`);
 // });
 app.listen(port, '0.0.0.0', () => {
-  console.log(`Server running at http://192.168.1.5:${port}`);
+  console.log(`Server running`);
 });
   
 try {

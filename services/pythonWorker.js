@@ -14,22 +14,6 @@ function getWorker() { // Create or return an existing worker process
   // Spawn a new python worker process
   pyWorker = spawn(pythonPath, [workerPath], { stdio: ['pipe', 'pipe', 'pipe'] }); 
 
-  // pyWorker.stderr.on('data', (data) => { // Log any errors from the python worker to console
-  //   console.error('[pyworker stderr]', data.toString());
-  // });
-
-  // pyWorker.on('close', (code) => { // Handle unexpected worker exit
-  //   console.error('[pyworker] exited with code', code);
-  //   pyWorker  = null; // Set worker to null so it can be recreated
-  // });
-
-  // pyWorker.on('error', (err) => { // Handle spawn error (for example if a file is not found)
-  //   console.error('[pyworker] Failed to start worker.', err.message);
-  //   pyWorker = null;
-  // });
-
-  // console.log('[pyworker] started. Path: ' + pythonPath);
-  // return pyWorker;
   pyWorker.on('exit', (code, signal) => {
     console.error(`[pyworker] exited with code=${code}, signal=${signal}`);
     pyWorker = null;
@@ -42,33 +26,54 @@ function getWorker() { // Create or return an existing worker process
   return pyWorker;
 }
 
+const INFER_TIMEOUT_MS = 120000; 
+
 // Send an inference request to the worker and wait for response
 function inferWithWorker(imagePath, topk = 5) {
   return new Promise((resolve, reject) => {
     const worker = getWorker(); // Ensure we have a worker process
     let buf = ''; // Buffer to accumulate stdout data
 
-    // Listen for worker output
     const onData = (d) => {
       buf += d.toString();
-      const nl = buf.indexOf('\n'); // Python worker sends one line per result
-      if (nl !== -1) {
+
+      let nl;
+      while ((nl = buf.indexOf('\n')) !== -1) {
         const line = buf.slice(0, nl);
         buf = buf.slice(nl + 1);
-        worker.stdout.off('data', onData);
+
+        const trimmed = line.trim();
+        if (!trimmed) {
+          // empty line, ignore
+          continue;
+        }
 
         try {
-          const json = JSON.parse(line); // Parse the JSON result
-          if (json.error) return reject(new Error(json.error));
-          resolve(json);
+          // only stop listening once we successfully parse JSON
+          const json = JSON.parse(trimmed);
+          worker.stdout.off('data', onData);
+          clearTimeout(timer);
+
+          if (json.error) {
+            return reject(new Error(json.error));
+          }
+          return resolve(json);
         } catch (e) {
-          reject(e);
+          // not valid JSON, probably a startup log line, ignore it
+          console.warn('[pyworker] ignoring non-JSON line from stdout:', trimmed);
+          // keep listening for the next line
+          continue;
         }
       }
     };
 
-    // Attach listener and send JSON request
     worker.stdout.on('data', onData);
+
+    const timer = setTimeout(() => {
+      worker.stdout.off('data', onData);
+      reject(new Error('Inference timed out'));
+    }, INFER_TIMEOUT_MS);
+
     worker.stdin.write(JSON.stringify({ image: imagePath, topk }) + '\n');
   });
 }

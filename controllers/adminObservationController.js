@@ -1,11 +1,9 @@
-// controllers/adminObservationController.js
 const fs = require('fs');
 const path = require('path');
-const db = require('../config/db'); // MySQL connection for backend
+const db = require('../config/db');
 
 const SPECIES_IMAGE_ROOT = path.join(__dirname, '..', 'species_images');
 
-// same slugify as in your AI backend
 function slugifyName(name) {
   return String(name)
     .trim()
@@ -32,22 +30,16 @@ async function copyObservationImageToSpeciesFolder(scientific_name, photoUrl) {
   return `/species_images/${safeName}/${filename}`;
 }
 
-function getScientificNameById(species_id) {
-  return new Promise((resolve, reject) => {
-    db.query(
-      'SELECT scientific_name FROM species WHERE species_id = ? LIMIT 1',
-      [species_id],
-      (err, rows) => {
-        if (err) return reject(err);
-        resolve(rows && rows[0] ? rows[0].scientific_name : null);
-      }
-    );
-  });
+async function getScientificNameById(species_id) {
+  const [rows] = await db.query(
+    'SELECT scientific_name FROM species WHERE species_id = ? LIMIT 1',
+    [species_id]
+  );
+  return rows && rows[0] ? rows[0].scientific_name : null;
 }
 
 /**
  * GET /api/admin/observations
- * list observations by status, with auto_flagged + threshold logic
  */
 async function listObservations(req, res) {
   try {
@@ -72,20 +64,8 @@ async function listObservations(req, res) {
       ? Math.max(0, Math.min(1, rawThresh))
       : null;
 
-    // This replicates your listObservationsByStatus query
     const statusPlaceholders = statuses.map(() => '?').join(',');
     const params = [...statuses];
-
-    // let topExpr = 'MAX(ar.confidence_score)';
-    // if (autoFlagged && threshold != null) {
-    //   topExpr = `
-    //     CASE
-    //       WHEN MAX(ar.confidence_score) < ${threshold}
-    //         THEN MAX(ar.confidence_score)
-    //       ELSE MAX(ar.confidence_score)
-    //     END
-    //   `;
-    // }
 
     const topExpr = 'MAX(ar.confidence_score)';
     let sql = `
@@ -127,42 +107,36 @@ async function listObservations(req, res) {
     }
 
     sql += ' ORDER BY po.created_at DESC LIMIT ? OFFSET ?';
-
     params.push(pageSize, offset);
 
-    db.query(sql, params, (err, rows) => {
-      if (err) {
-        console.error('[admin listObservations] db error', err);
-        return res.status(500).json({ error: 'Failed to fetch observations' });
-      }
+    const [rows] = await db.query(sql, params);
 
-      const origin = `${req.protocol}://${req.get('host')}`;
-      const data = rows.map(r => ({
-        observation_id: r.observation_id,
-        plant_name: r.top_species_name || 'Unknown',
-        confidence: Number(r.top_confidence) || 0,
-        photo: r.photo_url && r.photo_url.startsWith('/')
-          ? origin + r.photo_url
-          : r.photo_url,
-        submitted_at: r.created_at,
-        location: r.location_name || '',
-        location_latitude: r.location_latitude,
-        location_longitude: r.location_longitude,
-        user: r.user_id ? `user_${r.user_id}` : '',
-      }));
+    const origin = `${req.protocol}://${req.get('host')}`;
+    const data = rows.map(r => ({
+      observation_id: r.observation_id,
+      plant_name: r.top_species_name || 'Unknown',
+      confidence: Number(r.top_confidence) || 0,
+      photo: r.photo_url && r.photo_url.startsWith('/')
+        ? origin + r.photo_url
+        : r.photo_url,
+      submitted_at: r.created_at,
+      location: r.location_name || '',
+      location_latitude: r.location_latitude,
+      location_longitude: r.location_longitude,
+      user: r.user_id ? `user_${r.user_id}` : '',
+    }));
 
-      const hasMore = rows.length === pageSize;
-      const next_page = hasMore ? page + 1 : null;
+    const hasMore = rows.length === pageSize;
+    const next_page = hasMore ? page + 1 : null;
 
-      res.json({
-        page,
-        page_size: pageSize,
-        statuses,
-        auto_flagged: autoFlagged,
-        threshold,
-        next_page,
-        data,
-      });
+    res.json({
+      page,
+      page_size: pageSize,
+      statuses,
+      auto_flagged: autoFlagged,
+      threshold,
+      next_page,
+      data,
     });
   } catch (e) {
     console.error('[admin listObservations] error', e);
@@ -172,40 +146,39 @@ async function listObservations(req, res) {
 
 /**
  * GET /api/admin/observations/:id
- * (you can wire this later if needed)
  */
-function getObservationDetail(req, res) {
+async function getObservationDetail(req, res) {
   const id = Number(req.params.id);
   if (!Number.isFinite(id) || id <= 0) {
     return res.status(400).json({ error: 'Invalid observation id' });
   }
 
-  const obsSql = 'SELECT * FROM plant_observations WHERE observation_id = ?';
-  db.query(obsSql, [id], (err, obsRows) => {
-    if (err) {
-      console.error('[getObservationDetail] obs error', err);
-      return res.status(500).json({ error: 'Failed to fetch observation' });
-    }
+  try {
+    const [obsRows] = await db.query(
+      'SELECT * FROM plant_observations WHERE observation_id = ?',
+      [id]
+    );
     if (!obsRows || !obsRows[0]) {
       return res.status(404).json({ error: 'Observation not found' });
     }
-
     const observation = obsRows[0];
-    const resSql = `
+
+    const [resRows] = await db.query(
+      `
       SELECT ar.*, s.scientific_name, s.common_name
       FROM ai_results ar
       LEFT JOIN species s ON s.species_id = ar.species_id
       WHERE ar.observation_id = ?
       ORDER BY ar.rank ASC
-    `;
-    db.query(resSql, [id], (err2, resRows) => {
-      if (err2) {
-        console.error('[getObservationDetail] ai error', err2);
-        return res.status(500).json({ error: 'Failed to fetch results' });
-      }
-      res.json({ observation, results: resRows });
-    });
-  });
+      `,
+      [id]
+    );
+
+    res.json({ observation, results: resRows });
+  } catch (err) {
+    console.error('[getObservationDetail] error', err);
+    res.status(500).json({ error: 'Failed to fetch observation' });
+  }
 }
 
 async function verifyObservation(req, res) {
@@ -215,7 +188,6 @@ async function verifyObservation(req, res) {
   }
 
   try {
-    // get top AI species for this observation
     const [rows] = await db.query(
       `SELECT species_id
        FROM ai_results
@@ -229,13 +201,11 @@ async function verifyObservation(req, res) {
     const speciesId = top ? top.species_id : null;
 
     if (speciesId != null) {
-      // set both status and species_id
       await db.query(
         'UPDATE plant_observations SET status = ?, species_id = ? WHERE observation_id = ?',
         ['verified', speciesId, id]
       );
     } else {
-      // no AI result, just set status
       await db.query(
         'UPDATE plant_observations SET status = ? WHERE observation_id = ?',
         ['verified', id]
@@ -255,17 +225,16 @@ async function rejectObservation(req, res) {
     return res.status(400).json({ error: 'Invalid observation id' });
   }
 
-  db.query(
-    'UPDATE plant_observations SET status = ? WHERE observation_id = ?',
-    ['rejected', id],
-    (err) => {
-      if (err) {
-        console.error('[rejectObservation] db error', err);
-        return res.status(500).json({ error: 'Failed to reject' });
-      }
-      res.json({ ok: true });
-    }
-  );
+  try {
+    await db.query(
+      'UPDATE plant_observations SET status = ? WHERE observation_id = ?',
+      ['rejected', id]
+    );
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('[rejectObservation] db error', err);
+    res.status(500).json({ error: 'Failed to reject' });
+  }
 }
 
 async function flagUnsureObservation(req, res) {
@@ -277,24 +246,22 @@ async function flagUnsureObservation(req, res) {
   try {
     const { notes } = req.body || {};
 
-    // Keep / set status as 'pending', optionally record a note
     await db.updateObservation({
       observation_id: id,
       status: 'pending',
       notes,
-      species_name: null,   // no change to species
+      species_name: null,
     });
 
     return res.json({ ok: true, id, status: 'pending' });
   } catch (err) {
     console.error('[flagUnsureObservation] db error', err);
-    return res.status(500).json({ error: 'Failed to flag observation as unsure' });
+    return res
+      .status(500)
+      .json({ error: 'Failed to flag observation as unsure' });
   }
 }
 
-/**
- * POST /api/admin/observations/:id/confirm-existing
- */
 async function confirmExisting(req, res) {
   try {
     const observation_id = Number(req.params.id);
@@ -320,25 +287,20 @@ async function confirmExisting(req, res) {
           .status(400)
           .json({ error: 'scientific_name cannot be empty' });
       }
-      // get or create species row
-      resolvedSpeciesId = await new Promise((resolve, reject) => {
-        db.query(
-          'SELECT species_id FROM species WHERE scientific_name = ? LIMIT 1',
-          [cleaned],
-          (err, rows) => {
-            if (err) return reject(err);
-            if (rows && rows[0]) return resolve(rows[0].species_id);
-            db.query(
-              'INSERT INTO species (scientific_name) VALUES (?)',
-              [cleaned],
-              (err2, result) => {
-                if (err2) return reject(err2);
-                resolve(result.insertId);
-              }
-            );
-          }
+
+      const [rows] = await db.query(
+        'SELECT species_id FROM species WHERE scientific_name = ? LIMIT 1',
+        [cleaned]
+      );
+      if (rows && rows[0]) {
+        resolvedSpeciesId = rows[0].species_id;
+      } else {
+        const [ins] = await db.query(
+          'INSERT INTO species (scientific_name) VALUES (?)',
+          [cleaned]
         );
-      });
+        resolvedSpeciesId = ins.insertId;
+      }
       sciName = cleaned;
     } else {
       return res.status(400).json({
@@ -346,17 +308,11 @@ async function confirmExisting(req, res) {
       });
     }
 
-    // fetch observation for photo_url
-    const obs = await new Promise((resolve, reject) => {
-      db.query(
-        'SELECT photo_url FROM plant_observations WHERE observation_id = ?',
-        [observation_id],
-        (err, rows) => {
-          if (err) return reject(err);
-          resolve(rows && rows[0] ? rows[0] : null);
-        }
-      );
-    });
+    const [obsRows] = await db.query(
+      'SELECT photo_url FROM plant_observations WHERE observation_id = ?',
+      [observation_id]
+    );
+    const obs = obsRows && obsRows[0] ? obsRows[0] : null;
     if (!obs) {
       return res.status(404).json({ error: 'Observation not found' });
     }
@@ -368,24 +324,17 @@ async function confirmExisting(req, res) {
       imgUrl = await copyObservationImageToSpeciesFolder(sciName, photoUrl);
 
       if (imgUrl) {
-        await new Promise((resolve, reject) => {
-          db.query(
-            'UPDATE species SET image_url = COALESCE(image_url, ?) WHERE species_id = ?',
-            [imgUrl, resolvedSpeciesId],
-            (err) => (err ? reject(err) : resolve())
-          );
-        });
+        await db.query(
+          'UPDATE species SET image_url = COALESCE(image_url, ?) WHERE species_id = ?',
+          [imgUrl, resolvedSpeciesId]
+        );
       }
     }
 
-    // attach observation to species + mark verified
-    await new Promise((resolve, reject) => {
-      db.query(
-        'UPDATE plant_observations SET species_id = ?, status = ? WHERE observation_id = ?',
-        [resolvedSpeciesId, 'verified', observation_id],
-        (err) => (err ? reject(err) : resolve())
-      );
-    });
+    await db.query(
+      'UPDATE plant_observations SET species_id = ?, status = ? WHERE observation_id = ?',
+      [resolvedSpeciesId, 'verified', observation_id]
+    );
 
     res.json({
       ok: true,
@@ -400,9 +349,6 @@ async function confirmExisting(req, res) {
   }
 }
 
-/**
- * POST /api/admin/observations/:id/confirm-new
- */
 async function confirmNew(req, res) {
   try {
     const observation_id = Number(req.params.id);
@@ -420,17 +366,11 @@ async function confirmNew(req, res) {
       return res.status(400).json({ error: 'scientific_name is required' });
     }
 
-    // fetch observation for photo_url
-    const obs = await new Promise((resolve, reject) => {
-      db.query(
-        'SELECT photo_url FROM plant_observations WHERE observation_id = ?',
-        [observation_id],
-        (err, rows) => {
-          if (err) return reject(err);
-          resolve(rows && rows[0] ? rows[0] : null);
-        }
-      );
-    });
+    const [obsRows] = await db.query(
+      'SELECT photo_url FROM plant_observations WHERE observation_id = ?',
+      [observation_id]
+    );
+    const obs = obsRows && obsRows[0] ? obsRows[0] : null;
     if (!obs) {
       return res.status(404).json({ error: 'Observation not found' });
     }
@@ -441,30 +381,22 @@ async function confirmNew(req, res) {
       photoUrl
     );
 
-    const species_id = await new Promise((resolve, reject) => {
-      db.query(
-        'INSERT INTO species (scientific_name, common_name, is_endangered, description, image_url) VALUES (?, ?, ?, ?, ?)',
-        [
-          scientific_name,
-          common_name || null,
-          is_endangered ? 1 : 0,
-          description || null,
-          imgUrl,
-        ],
-        (err, result) => {
-          if (err) return reject(err);
-          resolve(result.insertId);
-        }
-      );
-    });
+    const [ins] = await db.query(
+      'INSERT INTO species (scientific_name, common_name, is_endangered, description, image_url) VALUES (?, ?, ?, ?, ?)',
+      [
+        scientific_name,
+        common_name || null,
+        is_endangered ? 1 : 0,
+        description || null,
+        imgUrl,
+      ]
+    );
+    const species_id = ins.insertId;
 
-    await new Promise((resolve, reject) => {
-      db.query(
-        'UPDATE plant_observations SET species_id = ?, status = ? WHERE observation_id = ?',
-        [species_id, 'verified', observation_id],
-        (err) => (err ? reject(err) : resolve())
-      );
-    });
+    await db.query(
+      'UPDATE plant_observations SET species_id = ?, status = ? WHERE observation_id = ?',
+      [species_id, 'verified', observation_id]
+    );
 
     res.json({
       ok: true,
@@ -479,10 +411,6 @@ async function confirmNew(req, res) {
   }
 }
 
-/**
- * PUT /plant-observations/:id
- * generic update (status / notes / species_name)
- */
 async function updateObservationRoute(req, res) {
   const id = Number(req.params.id);
   if (!Number.isFinite(id) || id <= 0) {
@@ -510,39 +438,6 @@ async function updateObservationRoute(req, res) {
     console.error('[updateObservationRoute] db error', err);
     res.status(500).json({ error: 'Failed to update observation' });
   }
-
-  // const fields = [];
-  // const params = [];
-
-  // if (status) {
-  //   fields.push('status = ?');
-  //   params.push(status);
-  // }
-  // if (notes !== undefined) {
-  //   fields.push('notes = ?');
-  //   params.push(notes);
-  // }
-  // if (species_name !== undefined) {
-  //   fields.push('species_name = ?');
-  //   params.push(species_name);
-  // }
-
-  // if (!fields.length) {
-  //   return res.json({ ok: true, id, status: null });
-  // }
-
-  // params.push(id);
-
-  // const sql = `UPDATE plant_observations SET ${fields.join(', ')} WHERE observation_id = ?`;
-
-  // db.query(sql, params, (err) => {
-  //   if (err) {
-  //     console.error('[updateObservationRoute] db error', err);
-  //     return res.status(500).json({ error: 'Failed to update observation' });
-  //   }
-  //   res.json({ ok: true, id, status: status || null });
-  // });
-
 }
 
 module.exports = {
@@ -553,5 +448,5 @@ module.exports = {
   confirmExisting,
   confirmNew,
   updateObservationRoute,
-  flagUnsureObservation, 
+  flagUnsureObservation,
 };

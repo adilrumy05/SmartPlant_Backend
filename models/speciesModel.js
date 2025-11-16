@@ -1,12 +1,25 @@
 const db = require('../config/db');
 
-// Fetches a clean list of species (ID and name)
+// Fetches full species data plus a representative location
 exports.getAllSpecies = async () => {
   const query = `
     SELECT 
-      species_id, 
-      COALESCE(scientific_name, common_name, 'Unnamed Species') AS display_name
-    FROM species
+      s.species_id,
+      s.scientific_name,
+      s.common_name,
+      s.is_endangered,
+      COALESCE(s.common_name, s.scientific_name, 'Unnamed Species') AS display_name,
+      AVG(po.location_latitude)  AS sample_latitude,
+      AVG(po.location_longitude) AS sample_longitude
+    FROM species s
+    LEFT JOIN plant_observations po
+      ON po.species_id = s.species_id
+     AND po.status = 'verified'
+    GROUP BY
+      s.species_id,
+      s.scientific_name,
+      s.common_name,
+      s.is_endangered
     ORDER BY display_name;
   `;
 

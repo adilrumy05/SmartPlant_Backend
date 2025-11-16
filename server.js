@@ -19,6 +19,8 @@ const mfaRoutes = require('./routes/mfaRoutes');
 //const aiRoutes = require('./routes/aiRoutes');
 const plantScanRoutes = require('./routes/plantScanRoutes');
 const adminObservationRoutes = require('./routes/adminObservationRoutes');
+const mapRoutes = require('./routes/mapRoutes');
+const adminMapRoutes = require('./routes/adminMapRoutes');
 
 // --- MQTT ---
 const mqttClient = require('./mqtt/mqttClient'); // Initializes MQTT
@@ -54,6 +56,8 @@ app.use('/api/species', speciesRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/mfa', mfaRoutes);
 app.use('/api', dataRoutes);
+app.use('/api/map', mapRoutes);
+app.use('/api/admin/map', adminMapRoutes);
 // Health check (optional)
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });

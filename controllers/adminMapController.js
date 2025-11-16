@@ -1,7 +1,6 @@
-// controllers/adminMapController.js
 const db = require('../config/db');
-const { encryptLocation } = require('../modules/encryption_module');
 
+// Toggle masking for an observation
 async function updateObservationMask(req, res) {
   const id = req.params.id;
   const { is_masked } = req.body;
@@ -17,46 +16,41 @@ async function updateObservationMask(req, res) {
     console.error('[updateObservationMask]', err);
     res
       .status(500)
-      .json({ success: false, error: 'Failed to update mask' });
+      .json({ success: false, error: 'Failed to update mask state' });
   }
 }
 
+// Update lat / lon / location name for an observation
 async function updateObservationLocation(req, res) {
   const id = req.params.id;
   const { latitude, longitude, location_name } = req.body;
 
-  try {
-    let encrypted = null;
-    if (latitude != null && longitude != null) {
-      encrypted = encryptLocation(Number(latitude), Number(longitude));
-    }
+  // convert to numbers or null
+  const lat =
+    latitude === '' || latitude == null ? null : Number(latitude);
+  const lon =
+    longitude === '' || longitude == null ? null : Number(longitude);
 
+  try {
     await db.query(
       `
       UPDATE plant_observations
-      SET 
-        location_enc       = ?,   -- encrypted bundle
+      SET
+        location_latitude  = ?,
+        location_longitude = ?,
         location_name      = ?,
-        location_latitude  = ?,   -- raw coords
-        location_longitude = ?
+        location_enc       = NULL   -- not using encrypted bundle for now
       WHERE observation_id = ?
       `,
-      [
-        encrypted,
-        location_name || null,
-        latitude != null ? latitude : null,
-        longitude != null ? longitude : null,
-        id,
-      ]
+      [lat, lon, location_name || null, id]
     );
 
     res.json({ success: true });
   } catch (err) {
     console.error('[updateObservationLocation]', err);
-    res.status(500).json({
-      success: false,
-      error: 'Failed to update location',
-    });
+    res
+      .status(500)
+      .json({ success: false, error: 'Failed to update location' });
   }
 }
 

@@ -1,38 +1,57 @@
 const axios = require('axios');
-// 1. IMPORT 'deviceModel' instead of 'sensorModel'
 const deviceModel = require('../models/deviceModel');
+const https = require('https'); // For SSL fix
 
-// NGROK URL (unchanged)
+// NGROK URL
 const AI_SERVICE_URL = 'https://ripe-jadiel-illy.ngrok-free.dev/generate';
 
-// 2. REWRITE 'buildMessages' to handle a FULL LIST of devices
+// Agent to bypass SSL verification (SSL FIX)
+const agent = new https.Agent({  
+  rejectUnauthorized: false
+});
+
+/**
+ * Builds the prompt with real-time data and instructions.
+ */
 const buildMessages = (allDevices, userQuery) => {
 
   // Create a clean summary of the data
   const deviceDataSummary = allDevices.map(device => ({
     device_name: device.device_name,
     species_name: device.species_name,
-    status: device.alerts ? `ALERT: ${device.alerts}` : 'Nominal',
+    status: (device.alerts && device.alerts.length > 0) ? `ALERT: ${device.alerts}` : 'Nominal',
     readings: device.readings
   }));
 
-  // System prompt
-  const systemMessage = `You are a plant-monitoring assistant for a dashboard with ${allDevices.length} devices.
-    
-    Here is the current real-time data for all devices:
-    ${JSON.stringify(deviceDataSummary, null, 2)}
+  // The improved summarization prompt
+  const systemMessage = `You are a specialized AI assistant for a plant monitoring dashboard.
+Your primary role is to summarize the current status of all devices and answer questions using the real-time data provided.
 
-    Use this data to answer the user's questions. You can summarize, compare, and triage alerts across all nodes.
-    If the user greets you, greet back.
-    If the user asks something unrelated, politely say you can only discuss plant sensor data.`;
+Here is the current real-time data for all devices:
+${JSON.stringify(deviceDataSummary, null, 2)}
+
+---
+INSTRUCTIONS:
+- Each device is associated with a device_id and is monitoring one plant species, the device reports back the latest sensor readings of the plant.
+- Your default behavior is to summarize. If the user asks a general question like "How are things?" or "What's the status?", provide a summary.
+- In your summary, state the total number of devices, how many have active alerts and the type of active alerts for each device.
+- When asked a specific question (e.g., "What's the temperature of Device 1?"), use the data to provide a direct, factual answer about that one specific device.
+- When asked if a plant is thirsty, refer to that plant's 'soil_moisture' and give an accurate reasoning.
+- When asked if its going to rain soon, take the average between all the plant's humidity readings to give a more accurate prediction.
+- Be concise , short and data-driven. Do not make up information.
+- If the user greets you, greet back in a short sentence.
+- If the user asks something unrelated, politely say you can only discuss plant sensor data.
+---`;
   
-  // Message history (unchanged)
   return [
     { role: 'system', content: systemMessage },
     { role: 'user', content: userQuery }
   ];
 };
 
+/**
+ * Handles the chat request from any client (app or web)
+ */
 exports.handleChat = async (req, res) => {
   try {
     const { query } = req.body;
@@ -40,22 +59,27 @@ exports.handleChat = async (req, res) => {
       return res.status(400).json({ error: 'Query is required' });
     }
 
-    // 3. CALL 'getAllDeviceStatuses' to get the FULL dashboard list
     const allDeviceData = await deviceModel.getAllDeviceStatuses();
 
-    // Check if sensor data is available
     if (!allDeviceData || allDeviceData.length === 0) {
-      // If no data, send the fallback message
       return res.json({ reply: "Sensor Data are currently unavailable, please try again later." });
     }
 
-    // If data exists, build the multi-node prompt
     const messages = buildMessages(allDeviceData, query);
 
-    // Call the AI service (unchanged)
-    const aiResponse = await axios.post(AI_SERVICE_URL, { messages });
+    // Call the AI service with all fixes
+    const aiResponse = await axios.post(
+      AI_SERVICE_URL, 
+      { messages },
+      { 
+        httpsAgent: agent, // SSL FIX
+        headers: {
+          'ngrok-skip-browser-warning': 'true' // NGROK 403 FIX
+        },
+        timeout: 90000 // TIMEOUT FIX
+      }
+    );
 
-    // Send the AI's reply back to the React Native app (unchanged)
     res.json({ reply: aiResponse.data.reply });
     
   } catch (err) {

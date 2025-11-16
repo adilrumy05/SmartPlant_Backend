@@ -21,6 +21,7 @@ const plantScanRoutes = require('./routes/plantScanRoutes');
 const adminObservationRoutes = require('./routes/adminObservationRoutes');
 const mapRoutes = require('./routes/mapRoutes');
 const adminMapRoutes = require('./routes/adminMapRoutes');
+const observationRoutes =  require('./routes/observationRoutes.js');
 
 // --- MQTT ---
 const mqttClient = require('./mqtt/mqttClient'); // Initializes MQTT
@@ -58,6 +59,7 @@ app.use('/api/mfa', mfaRoutes);
 app.use('/api', dataRoutes);
 app.use('/api/map', mapRoutes);
 app.use('/api/admin/map', adminMapRoutes);
+app.use('/api/observations', observationRoutes);
 // Health check (optional)
 app.get("/health", (req, res) => {
   res.json({ status: "ok" });

@@ -189,6 +189,39 @@ async function getObservationWithResults(observation_id) {
   return { observation, results: resRows };
 }
 
+// Get all verified, unmasked observations for the public feed
+async function getVerifiedObservationFeed() {
+  const [rows] = await pool.query(
+    `
+      SELECT
+        o.observation_id,
+        o.photo_url,
+        o.location_latitude,
+        o.location_longitude,
+        o.created_at,
+        o.source,
+        o.notes,
+        s.scientific_name,
+        s.common_name,
+        s.description,
+        s.image_url,
+        s.is_endangered,
+        u.username,
+        ar.confidence_score
+      FROM plant_observations o
+      JOIN species s ON o.species_id = s.species_id
+      JOIN users u ON o.user_id = u.user_id
+      JOIN ai_results ar 
+        ON ar.observation_id = o.observation_id 
+       AND ar.rank = 1
+      WHERE o.status = 'verified'
+        AND o.is_masked = 0
+      ORDER BY o.created_at DESC
+    `
+  );
+  return rows;
+}
+
 async function listObservationsByStatus(
   statuses = ['pending'],
   limit = 20,
@@ -314,6 +347,7 @@ module.exports = {
   insertObservation,
   insertAiResults,
   getObservationWithResults,
+  getVerifiedObservationFeed,
   listObservationsByStatus,
   updateObservationStatus,
   updateObservation,

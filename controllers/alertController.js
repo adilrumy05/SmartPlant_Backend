@@ -22,7 +22,7 @@ exports.resolveAlert = async (req, res) => {
 
 exports.resolveAlertsForDevice = async (req, res) => {
   try {
-    const { id } = req.params; // This will be the raw device_id
+    const { id } = req.params; 
     await alertModel.resolveAlertsForDevice(id);
     res.json({ success: true, message: 'Alerts for device resolved' });
   } catch (err) {

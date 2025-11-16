@@ -26,17 +26,15 @@ exports.addNewDevice = async (req, res) => {
   try {
     const { device_name, species_id, latitude, longitude } = req.body;
 
-    // ⬇️ *** CHANGE THIS VALIDATION *** ⬇️
-    // Add '!species_id' to the check.
+
     if (!device_name || !latitude || !longitude || !species_id) {
       return res.status(400).json({ error: 'Missing required fields. All fields are mandatory.' });
     }
 
-    // ⬇️ *** CHANGE THIS DATA OBJECT *** ⬇️
-    // Remove the '|| null' fallback
+
     const newDeviceData = {
       device_name,
-      species_id: species_id, // <-- No longer defaults to null
+      species_id: species_id, 
       latitude: parseFloat(latitude),
       longitude: parseFloat(longitude),
     };

@@ -13,8 +13,8 @@ async function processSensorReading(sensorData, alertInfoList) {
     const sqlReading = `
       INSERT INTO sensor_readings
         (device_id, temperature, humidity, soil_moisture, motion_detected,
-         alert_generated, reading_status, reading_timestamp)
-      VALUES (?, ?, ?, ?, ?, ?, 'ok', NOW())
+         alert_generated, reading_timestamp)
+      VALUES (?, ?, ?, ?, ?, ?, NOW())
     `;
     const paramsReading = [
       sensorData.device_id,

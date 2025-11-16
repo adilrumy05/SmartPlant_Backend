@@ -2,7 +2,6 @@
 const sensorModel = require('../models/sensorModel');
 const thresholds = require('../config/alertThresholds');
 
-// This function now returns an ARRAY of alerts
 const checkAlerts = (data) => {
   const { temperature, humidity, soil_moisture, motion_detected } = data;
   const alerts = []; // Initialize an empty array
@@ -45,7 +44,7 @@ const checkAlerts = (data) => {
   }
   
   return {
-    alertInfoList: alerts, // This is now an array
+    alertInfoList: alerts,
     alert_generated: alerts.length > 0, // True if the array is not empty
   };
 };
@@ -69,14 +68,14 @@ exports.insertSensorData = (data) => {
   // 3. Call the model to process the reading and the ARRAY of alerts
   sensorModel.processSensorReading(sensorData, alertInfoList)
     .then(result => {
-      console.log(`✅ Sensor data processed (Reading ID: ${result.readingId}). ${alertInfoList.length} alerts created.`);
+      console.log(`Sensor data processed (Reading ID: ${result.readingId}). ${alertInfoList.length} alerts created.`);
     })
     .catch(err => {
-      console.error('❌ Error processing sensor reading:', err);
+      console.error('Error processing sensor reading:', err);
     });
 };
 
-// This function is no longer used by the MQTT flow, but kept for /api/data
+// This function is for /api/data
 exports.getLatestSensorData = (latestValue) => {
   return { latest: latestValue };
 };

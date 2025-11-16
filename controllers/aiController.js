@@ -1,6 +1,6 @@
 const axios = require('axios');
 const deviceModel = require('../models/deviceModel');
-const https = require('https'); // For SSL fix
+const https = require('https'); // For SSL 
 
 // NGROK URL
 const AI_SERVICE_URL = 'https://ripe-jadiel-illy.ngrok-free.dev/generate';
@@ -10,9 +10,7 @@ const agent = new https.Agent({
   rejectUnauthorized: false
 });
 
-/**
- * Builds the prompt with real-time data and instructions.
- */
+
 const buildMessages = (allDevices, userQuery) => {
 
   // Create a clean summary of the data
@@ -23,7 +21,7 @@ const buildMessages = (allDevices, userQuery) => {
     readings: device.readings
   }));
 
-  // The improved summarization prompt
+  //summarization prompt
   const systemMessage = `You are a specialized AI assistant for a plant monitoring dashboard.
 Your primary role is to summarize the current status of all devices and answer questions using the real-time data provided.
 
@@ -67,16 +65,16 @@ exports.handleChat = async (req, res) => {
 
     const messages = buildMessages(allDeviceData, query);
 
-    // Call the AI service with all fixes
+    // Call the AI service
     const aiResponse = await axios.post(
       AI_SERVICE_URL, 
       { messages },
       { 
-        httpsAgent: agent, // SSL FIX
+        httpsAgent: agent, // SSL
         headers: {
-          'ngrok-skip-browser-warning': 'true' // NGROK 403 FIX
+          'ngrok-skip-browser-warning': 'true' // NGROK 403
         },
-        timeout: 90000 // TIMEOUT FIX
+        timeout: 90000 // TIMEOUT
       }
     );
 

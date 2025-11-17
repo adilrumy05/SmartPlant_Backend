@@ -1,8 +1,10 @@
-const fs = require('fs');
+const fs = require('fs/promises');
 const path = require('path');
 const db = require('../config/db');
 
 const SPECIES_IMAGE_ROOT = path.join(__dirname, '..', 'species_images');
+
+
 
 function slugifyName(name) {
   return String(name)
@@ -11,21 +13,33 @@ function slugifyName(name) {
     .replace(/[^a-z0-9]+/g, '_')
     .replace(/^_+|_+$/g, '');
 }
-
 async function copyObservationImageToSpeciesFolder(scientific_name, photoUrl) {
   if (!scientific_name || !photoUrl) return null;
+
+  // If the image is a remote URL, do NOT try to copy it to disk
+  if (/^https?:\/\//i.test(photoUrl)) {
+    console.warn(
+      '[copyObservationImageToSpeciesFolder] remote URL, skipping copy:',
+      photoUrl
+    );
+    return null;
+  }
 
   const safeName = slugifyName(scientific_name);
   const speciesDir = path.join(SPECIES_IMAGE_ROOT, safeName);
 
-  await fs.promises.mkdir(speciesDir, { recursive: true });
+  // fs is already "fs/promises", so you call fs.mkdir, not fs.promises.mkdir
+  await fs.mkdir(speciesDir, { recursive: true });
 
-  const filename = path.basename(photoUrl);
+  // Handle things like "/uploads/xyz.jpg"
+  const relativePath = photoUrl.replace(/^[\\/]+/, ''); // strip leading / or \
   const uploadsDir = path.join(__dirname, '..');
-  const srcPath = path.join(uploadsDir, photoUrl.replace(/^\//, ''));
+  const srcPath = path.join(uploadsDir, relativePath);
+
+  const filename = path.basename(relativePath);
   const destPath = path.join(speciesDir, filename);
 
-  await fs.promises.copyFile(srcPath, destPath);
+  await fs.copyFile(srcPath, destPath);
 
   return `/species_images/${safeName}/${filename}`;
 }
@@ -449,4 +463,5 @@ module.exports = {
   confirmNew,
   updateObservationRoute,
   flagUnsureObservation,
+  copyObservationImageToSpeciesFolder
 };

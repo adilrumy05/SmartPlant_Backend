@@ -17,13 +17,13 @@ const BCRYPT_ROUNDS = Number(process.env.BCRYPT_COST || 12);
 function loadKey() {
   const b64 = process.env.DATA_KEY_B64;
   if (!b64) {
-    console.log("❌ Missing DATA_KEY_B64 in .env");
+    console.log("Missing DATA_KEY_B64 in .env");
     return null;
   }
 
   const key = Buffer.from(b64, "base64");
   if (key.length !== KEY_LEN) {
-    console.log("❌ DATA_KEY_B64 must decode to 32 bytes");
+    console.log("DATA_KEY_B64 must decode to 32 bytes");
     return null;
   }
 

@@ -34,5 +34,5 @@ exports.sendOtpToEmail = async function (to, otp) {
   };
 
   await transporter.sendMail(mail);
-  console.log(`📧 MFA OTP sent to: ${to}`);
+  console.log(`MFA OTP sent to: ${to}`);
 };

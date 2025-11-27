@@ -1,11 +1,11 @@
-const crypto = require("crypto");       // Built-in AES/HMAC
-const bcrypt = require("bcryptjs");     // Password hashing
-require("dotenv").config();             // Load .env
+const crypto = require("crypto"); // Built-in AES/HMAC
+const bcrypt = require("bcryptjs"); // Password hashing
+require("dotenv").config(); // Load .env
 
 // AES settings
-const ALGO = "aes-256-gcm";             // Encryption algorithm
-const KEY_LEN = 32;                     // 32 bytes key
-const IV_LEN = 12;                      // 12 bytes IV
+const ALGO = "aes-256-gcm"; // Encryption algorithm
+const KEY_LEN = 32; // 32 bytes key
+const IV_LEN = 12; // 12 bytes IV
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_COST || 12);
 
 // Load main AES key for encrypting plant locations

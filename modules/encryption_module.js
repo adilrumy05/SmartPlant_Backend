@@ -1,6 +1,3 @@
-// modules/encryption_module.js
-// CommonJS version using the same coding style as maskEmail/sendOtpToEmail
-
 const crypto = require("crypto");       // Built-in AES/HMAC
 const bcrypt = require("bcryptjs");     // Password hashing
 require("dotenv").config();             // Load .env

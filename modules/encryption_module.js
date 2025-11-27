@@ -8,9 +8,7 @@ const KEY_LEN = 32;                     // 32 bytes key
 const IV_LEN = 12;                      // 12 bytes IV
 const BCRYPT_ROUNDS = Number(process.env.BCRYPT_COST || 12);
 
-// -----------------------------------------------------
 // Load main AES key for encrypting plant locations
-// -----------------------------------------------------
 function loadKey() {
   const b64 = process.env.DATA_KEY_B64;
   if (!b64) {
@@ -27,9 +25,7 @@ function loadKey() {
   return key;
 }
 
-// -----------------------------------------------------
-// Encrypt text → AES-256-GCM
-// -----------------------------------------------------
+// Encrypt text -> AES-256-GCM
 exports.encryptText = function (text) {
   if (!text) {
     console.log("encryptText: no text provided");
@@ -39,7 +35,7 @@ exports.encryptText = function (text) {
   const key = loadKey();
   if (!key) return null;
 
-  const iv = crypto.randomBytes(IV_LEN);       // Random IV each time
+  const iv = crypto.randomBytes(IV_LEN); // Random IV each time
   const cipher = crypto.createCipheriv(ALGO, key, iv);
 
   const encrypted = Buffer.concat([
@@ -47,7 +43,7 @@ exports.encryptText = function (text) {
     cipher.final(),
   ]);
 
-  const tag = cipher.getAuthTag();             // Authentication tag
+  const tag = cipher.getAuthTag(); // Authentication tag
 
   // Return encrypted bundle object
   return {
@@ -57,9 +53,7 @@ exports.encryptText = function (text) {
   };
 };
 
-// -----------------------------------------------------
-// Decrypt AES-GCM bundle → plain text
-// -----------------------------------------------------
+// Decrypt AES-GCM bundle -> plain text
 exports.decryptText = function (bundle) {
   if (!bundle || !bundle.iv || !bundle.ct || !bundle.tag) {
     console.log("decryptText: invalid bundle");
@@ -84,19 +78,17 @@ exports.decryptText = function (bundle) {
   return decrypted.toString("utf8");
 };
 
-// -----------------------------------------------------
 // Hashing key for lookup indexes (email_index, etc.)
-// -----------------------------------------------------
 function loadIndexKey() {
   const b64 = process.env.INDEX_KEY_B64;
   if (!b64) {
-    console.log("❌ Missing INDEX_KEY_B64 in .env");
+    console.log("Missing INDEX_KEY_B64 in .env");
     return null;
   }
 
   const key = Buffer.from(b64, "base64");
   if (key.length !== KEY_LEN) {
-    console.log("❌ INDEX_KEY_B64 must decode to 32 bytes");
+    console.log("INDEX_KEY_B64 must decode to 32 bytes");
     return null;
   }
 
@@ -118,9 +110,7 @@ exports.makeLookupKey = function (value) {
     .digest("base64");
 };
 
-// -----------------------------------------------------
 // Password helpers
-// -----------------------------------------------------
 exports.hashPassword = async function (password) {
   if (!password) throw new Error("Password required");
   return bcrypt.hash(password, BCRYPT_ROUNDS);
@@ -131,9 +121,7 @@ exports.checkPassword = async function (password, savedHash) {
   return bcrypt.compare(password, savedHash);
 };
 
-// -----------------------------------------------------
 // Helpers for storing encryption bundles in DB
-// -----------------------------------------------------
 exports.saveBundle = function (obj) {
   // Convert bundle object → JSON string
   return JSON.stringify(obj);

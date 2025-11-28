@@ -42,6 +42,11 @@ npm install
 1. Start your MySQL server.
 2. Import the SQL file using your preferred method, for example:
 mysql -u <username> -p < sarawak_plant_db_v110.sql
+3. To run the backend and databse you should be on port 3307
+
+### 3.2 Edit the files
+1. in .env change DB_USER and DB_PASS to your mysql username and password
+2. in /config/db.js in the pool constant, change your DB_USER and DB_PASS to your mysql username and password
 
 Important:
 The backend will not function correctly without this database.

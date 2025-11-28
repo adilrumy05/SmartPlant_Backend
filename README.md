@@ -54,6 +54,14 @@ Make sure the SQL has been imported and the sarawak_plant_db database exists bef
 
 ---
 
-## 4. Running the Backend
+## 4. Running agentic service (do it once)
+1. Sign up for free ngrok account
+2. copy ngrok authtoken and paste into google colab file
+3. Run agentic ai file in google colab
+4. copy output link and paste into aicontroller.js
+
+---
+
+## 5. Running the Backend
 npm run start
 

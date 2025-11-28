@@ -28,6 +28,7 @@ Before running the backend, make sure you have:
 
 ### 2.1 Clone the repository
 git clone https://github.com/adilrumy05/SmartPlant_Backend.git
+
 cd SmartPlant_Backend
 
 ### 2.2 Install dependencies
